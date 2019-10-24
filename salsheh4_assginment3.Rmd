@@ -1,0 +1,71 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+
+Machine Learning
+Assignment 3
+```{r}
+#install.packages("dummies")
+#install.packages("dplyr")
+#install.packages("e1071")
+#install.packages("lattice")
+```
+
+
+
+```{r}
+library(ISLR)
+library(dummies)
+library(dplyr)
+library(e1071)
+```
+
+```{r}
+library(caret)
+Flight <- read.csv("C:/Users/smos5/OneDrive/Desktop/FlightDelays.csv")
+Flight$CRS_DEP_TIME<-as.factor(Flight$CRS_DEP_TIME)
+Flight$DAY_WEEK<-as.factor(Flight$DAY_WEEK)
+Flight <- Flight[,c(1, 2, 4, 8, 10, 13)]
+```
+
+```{r}
+#1
+Index_Train<-createDataPartition(Flight$Flight.Status, p=0.6, list=FALSE) # Use 60% of data for training and the rest for validation
+Train.data <-Flight[Index_Train,]
+Valid.data <-Flight[-Index_Train,]
+```
+
+```{r}
+#2
+# Build a naïve Bayes classifier
+nb_model <-naiveBayes(Flight.Status~CRS_DEP_TIME+CARRIER+DEST+ORIGIN+DAY_WEEK,data = Train.data)
+nb_model
+```
+
+
+```{r}
+
+library(gmodels)
+CrossTable(x=Train.data$Flight.Status,y=Train.data$DEST, prop.chisq = FALSE) 
+prop.table(table(Train.data$DEST, Train.data$Flight.Status))
+```
+
+
+```{r}
+#4
+Predicted_Valid_labels <-predict(nb_model,Valid.data)
+CrossTable(x=Valid.data$Flight.Status,y=Predicted_Valid_labels, prop.chisq = FALSE) 
+confusionMatrix(Predicted_Valid_labels, Valid.data$Flight.Status)
+
+Predicted_Validation_labels <-predict(nb_model,Valid.data, type = "raw")
+#show the first few values 
+head(Predicted_Validation_labels)
+library(pROC)
+#Passing the second column of the predicted probabilities 
+#That column contains the probability associate to 'ontime'
+roc(Valid.data$Flight.Status, Predicted_Validation_labels[,2])
+plot.roc(Valid.data$Flight.Status,Predicted_Validation_labels[,2])
+
+```
