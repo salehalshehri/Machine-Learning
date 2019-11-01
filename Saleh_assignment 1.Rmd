@@ -1,0 +1,65 @@
+---
+title: "assignment1"
+author: "saleh"
+date: "October 31, 2019"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+#install.packages("caret")
+library(caret)
+#install.packages("corrplot")
+library(corrplot)
+```
+
+```{r}
+s <-read.csv("season-1819_csv.csv")
+s <- s[,c(1:15)]
+
+# five-number-summary
+summary(s)
+str(s)
+summary(s$FTHG)
+tail(s)
+
+# descriptive statistics
+mean(s$FTHG)
+median(s$FTHG)
+sd(s$FTHG)
+max(s$WHA)
+min(s$FTHG)
+IQR(s$FTHG)
+```
+Trainsforming some factor variables to numeric for examble (3,4,7,10,11)
+```{r}
+#install.packages("car")
+library(car)
+s[,3] <- as.numeric(s[,3])
+s[,4] <- as.numeric(s[,4])
+s[,7] <- as.numeric(s[,7])
+s[,10] <- as.numeric(s[,10])
+s[,11] <- as.numeric(s[,11])
+str(s)
+```
+```{r}
+# ploting data
+boxplot(s$FTHG)
+hist(s$HS, col = "Blue")
+counts <- table(s$AwayTeam)
+pie(counts)
+```
+
+
+```{r}
+plot(s)
+```
+
+
+```{r}
+#install.packages("moments")
+library(moments)
+skewness(s$HS)
+```
+
