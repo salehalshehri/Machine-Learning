@@ -1,0 +1,202 @@
+---
+Saleh 
+
+Assignment 4
+---
+
+```{r}
+rm(list = ls(all=TRUE))
+```
+
+
+```{r}
+library(caret)
+library(ISLR)
+library(dplyr)
+library(ggvis)
+library(cluster)
+library(class)
+library(FNN)
+library(ggplot2)
+```
+
+```{r}
+
+#Read Data 
+cereals_Data <- read.csv("C:/Users/smos5/OneDrive/Desktop/KENT my courese/MIS 64060 - Machine Learning - Fall 2019/My assignments/Customer Rating of Breakfast Cereals/Cereals.csv")
+
+#Remove missing measurements from the dataset.
+cereals <- na.omit(cereals_Data)
+```
+
+```{r}
+cereals_D_C <- cereals[,-c(1,2,3)]
+str(cereals_D_C)
+```
+
+```{r}
+#install.package("dummies")
+library(dummies)
+
+# ceate dummy variables for shelf 
+cereals_D_C$shelf <- as.factor(cereals_D_C$shelf)
+cereals_dummy <- dummyVars(~shelf,data=cereals_D_C)
+head(predict(cereals_dummy,cereals_D_C))
+cereal <- dummy.data.frame(cereals_D_C, names = c("shelf"), sep= ".")
+```
+# Hierarchical Clustering
+* . Applying hierarchical clustering to the data using Euclidean distance to the normalized measurements.
+* - Use Agnes to compare the clustering from  single linkage, complete linkage, average linkage, and Ward. Choose the best method ?.
+
+```{r}
+# Normalizing data
+cereal_normalized <- scale(cereal)
+
+library(tidyverse)
+
+Agnes <- c("single", "ward", "complete", "average")
+names(Agnes) <- c("single", "ward", "complete", "average")
+# compute coefficient
+ac <- function(x) {
+  agnes(cereal_normalized, method = x)$ac}
+map_dbl(Agnes, ac)
+```
+* Ward's method is the highest.
+
+
+```{r}
+#install.packages("stats")
+#install.packages("HAC")
+
+library(stats)
+library(HAC)
+
+distance <- dist(cereal_normalized, method = "euclidean")
+hc <- hclust(distance, method = "ward.D2")
+plot(hc, cex = 0.6, hang = -1, main = "Dendrogram of agnes")
+```
+
+* Cutting the tree to 4 clusters, using the cutree() function
+```{r}
+library(devtools)
+library(htmltools)
+
+# Cut tree into 4 groups
+clusters <- cutree(hc, k = 4)
+table(clusters)
+# Store the clusters in a data frame along with the cereals data
+cereals_clusters <- cbind(clusters, cereal_normalized)
+```
+
+```{r}
+colnames(cereals_clusters)[1] <- "clusters"
+head(cereals_clusters)
+```
+ 
+
+```{r}
+plot(hc, cex= 0.6, hang = -1)
+rect.hclust(hc, k = 4, border = 2:7)
+abline(h = 14, col = 'yellow')
+```
+
+
+```{r}
+# set cluster member and cereal name
+row.names(cereal_normalized) <- paste(clusters, ": ", row.names(cereal), sep = "")
+
+heatmap(as.matrix(cereal_normalized), Colv = NA, hclustfun = hclust, 
+        col=rev(paste("gray",1:99,sep="")))
+```
+ 
+
+```{r}
+#install.packages("caTools")
+library(caTools)
+A<-cereal[1:60,] # Partition A
+B<-cereal[61:74,] # Partition B
+A_norm <- scale(A)
+B_norm <- scale(B)
+```
+ 
+* same way for clustering
+```{r}
+library(stats)
+library(HAC)
+
+distance_A <- dist(A_norm, method = "euclidean")
+h_A <- hclust(distance_A, method = "ward.D")
+clusters_A <- cutree(h_A, k = 4)
+
+
+
+cereal_A <- cbind(clusters_A, A_norm)
+colnames(cereal_A)[1] <- "clust_A"
+plot(h_A, cex= 0.6, hang = -1)
+
+
+
+rect.hclust(h_A, k = 4, border = 2:7)
+abline(h = 20, col = 'red')
+table(clusters_A)
+```
+
+# using tapply to calculate the centroids
+```{r}
+hm <- tapply(A_norm, list(rep(cutree(h_A, 4), ncol(A_norm)), col(A_norm)), mean)
+colnames(hm) <-colnames(cereal)
+hm
+```
+
+* we can Visualize the characteristics of clusters of prtition A
+```{r, fig.height=7, fig.width=12}
+#install.packages("hrbrthemes")
+library(hrbrthemes)
+#install.packages("GGally")
+library(GGally)
+library(viridis)
+ggparcoord((hm),
+           columns = 1:15, groupColumn = 1, 
+           showPoints = TRUE, 
+           alphaLines = 0.3 
+)
+```
+
+```{r}
+# predicting B records
+#install.packages("factoextra")
+library(factoextra)
+s<-data.frame(observations=seq(1,14,1),cluster=rep(0,14))
+for(i in 0:14)
+{
+  x1<-as.data.frame(rbind(hm,B_norm[i,]))
+  y1<-as.matrix(get_dist(x1))
+  s[i,2]<-which.min(y1[4,-4])
+}
+rownames(s) <-rownames(B_norm)
+s
+```
+```{r}
+cbind(all=cereals_clusters[61:74,1],partitionA=s$cluster)
+
+```
+
+```{r}
+table(s$cluster==cereals_clusters[61:74,1])
+```
+* the accuracy is high = 78 %
+
+* Extracting clustersrs
+```{r}
+groups <- clusters
+print_clusters <- function(labels, k) {
+  for(i in 1:k) {
+    print(paste("cluster", i))
+print(cereals[labels==i,c("calories","protein","fat","sodium","fiber","carbo","sugars","potass","vitamins")])}}
+print_clusters(groups, 4)
+```
+* Q 4
+```{r}
+# if the scale of variables are not im the same lenght we need to normalize it. but if we are dealimg with categorical data we can assign observations to clusters acording to classification.
+
+# for Public schools to choose the healthy cereals the cluster 1 is a best option since it has the cereals with high rates of protein , fiber, sodium, potass and customer rating, and it is healthy for students to have those types of cereals, so cluster 1 is the choice.
