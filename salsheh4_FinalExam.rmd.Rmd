@@ -1,0 +1,256 @@
+Saleh Alshehri
+salsheh4@kent.edu
+Final Exam of Machine Learning Fall 2019
+
+```{r}
+library(class)
+library(caret)
+library(ISLR)
+library(dummies)
+library(e1071)
+library(tidyverse)
+library(factoextra) 
+library(flexclust)
+library(imputeTS)
+library(stats)
+library(FNN)
+library(dplyr)
+library(ggvis)
+library(ggplot2)
+
+#Read Data 
+BathSoap <- read.csv("C:/Users/smos5/OneDrive/Desktop/KENT my courese/MIS 64060 - Machine Learning - Fall 2019/final exam/BathSoap.csv")
+
+```
+
+# Q 1 
+#Clusters for "Purchase Behavior" 
+```{r}
+Soap_Data <- BathSoap[20:46] %>% mutate_each(funs(as.numeric(gsub("%", "", ., fixed = TRUE))/100))
+Soap <- cbind(BathSoap[1:19],Soap_Data)
+
+Behavior<-Soap[,12:31]
+# Finding out the total volumes for each brand category
+volume <- function(x){
+return(x*Behavior$Total.Volume)
+}
+vol<-as.data.frame(lapply(Behavior[9:20],volume))
+```
+
+```{r}
+Purchase_Behavior <- Behavior[,1:8]
+Purchase_Behav <- cbind(Purchase_Behavior,vol)
+head(Purchase_Behav)
+Purchase_Behav$max <- apply(Purchase_Behav[,12:19], 1, max)
+head(Purchase_Behav)
+```
+
+```{r}
+Soap_scaled <- scale(Purchase_Behav[c(1:8,20,21)])
+head(Soap_scaled)
+```
+
+I am going to  use  "elbow method" to determine the best k
+```{r,  fig.height=4.5, fig.width=12}
+wss <- (nrow(Soap_scaled)-1)*sum(apply(Soap_scaled,2,var))
+wss
+
+for (i in 2:15) 
+  wss[i] <- sum(kmeans(Soap_scaled, 
+                       centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters", 
+     ylab="Within groups sum of squares",
+     main="Assessing the Optimal Number of Clusters with the Elbow Method",
+     pch=19, cex=2)
+```
+
+* Let us now run the k-means algorithm using k = 3.
+```{r}
+set.seed(123)
+k3 <- kmeans(Soap_scaled, centers = 3, nstart = 25) 
+```
+
+```{r,  fig.height=5, fig.width=11}
+set.seed(123)
+
+plot(Soap_scaled, col =(k3$cluster) , 
+     main="K-Means with 3 clusters", 
+     pch=16, cex=2)
+k3$centers
+k3$size
+```
+.	Cluster 1, has highly loyalty, preferring main brands and bigger individual purchases.
+.	Cluster 2, has moderate loyalty, preferring many brands, and of high value.
+.	Cluster 3, has not very loyal, but may be of the least interest since its customers have the 
+
+
+
+#  B
+# Clusters based on "Basis for Purchase"
+
+```{r}
+set.seed(123)
+# #Subsetting basis of purchase varaibles
+P_Basis<-Soap[,c(14,20:22,32:36,45)]
+# Finding out the total volumes for each brand category
+volume2 <- function(x){
+return(x*P_Basis$Total.Volume)
+}
+Pur_Basis<-as.data.frame(lapply(P_Basis[2:10],volume2))
+```
+
+
+```{r}
+Basis_scaled <- scale(Pur_Basis)
+head(Basis_scaled)
+```
+* use "elbow chart" to determine the best k
+```{r,  fig.height=5, fig.width=11}
+set.seed(123)
+wss <- (nrow(Basis_scaled)-1)*sum(apply(Basis_scaled,2,var))
+wss
+for (i in 2:15) 
+  wss[i] <- sum(kmeans(Basis_scaled, 
+                       centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters", 
+     ylab="Sum of Squares",
+     main="Best Number of Clusters by Elbow Method",
+     pch=19, cex=2)
+```
+.	k =4 is the best number of clusters according to the Elbow method
+
+```{r}
+set.seed(123)
+k4 <- kmeans(Basis_scaled, centers = 4, nstart = 25) # k = 4, number of restarts = 25
+```
+
+```{r,  fig.height=5, fig.width=11}
+set.seed(123)
+
+plot(Basis_scaled, col =(k4 $cluster) , 
+     main="K-Means with 3 clusters", 
+     pch=16, cex=2)
+```
+
+
+.	Cluster 1, high loyal
+.	Cluster 2,  needs promotions. 
+.	Cluster 3, is averse to promotions.
+
+
+#C
+# Clusters based on all the above (purchase behavior and basis of purchase)
+```{r}
+set.seed(123)
+Both <-cbind(Soap_scaled, Basis_scaled)
+
+k2_B <- kmeans(Both, centers = 2, nstart = 25) 
+k2_B$centers
+k2_B$size
+```
+
+* characteristics of clusters
+```{r}
+cluster_Both <- c(1,2)
+Both_clusters <- cbind(cluster_Both, k2_B$centers)
+
+library(GGally)
+ggparcoord((Both_clusters),
+           columns = 1:10, groupColumn = 1, 
+           showPoints = TRUE, 
+           alphaLines = 0.3 
+)
+```
+* demographic information
+```{r,  fig.height=5, fig.width=11}
+set.seed(125)
+
+Demo <- Soap[2:11]
+demo_scaled <- scale(Demo)
+Both_Demo <- cbind(demo_scaled,Both)
+
+k2_Both_Demo <- kmeans(Both_Demo, centers = 2, nstart = 25) 
+k2_Both_Demo$centers
+k2_Both_Demo$size
+boxplot(Both_Demo)
+```
+* Avg Price being an important exception.
+Cluster1 = 69, is the more loyal cluster, with lower socioeconomic status and affluence.
+
+
+
+# Q 2.
+# Best cluster approach
+
+*use "elbow chart" to determine the best k
+```{r, fig.height=4.5, fig.width=14}
+set.seed(125)
+#Scree Plot - Check for the optimal number of clusters given the data
+wss2 <- (nrow(Both_Demo)-1)*sum(apply(Both_Demo,2,var))
+wss2
+
+for (i in 2:15) 
+  wss2[i] <- sum(kmeans(Both_Demo, 
+                       centers=i)$withinss)
+plot(1:15, wss2, type="b", xlab="Number of Clusters", 
+     ylab="Sum of Squares",
+     main="Best Number of Clusters by Elbow Method",
+     pch=19, cex=2)
+```
+* k =4 seem to be the best options
+
+```{r,  fig.height=4.5, fig.width=14}
+set.seed(125)
+k4_BothD <- kmeans(Both_Demo, centers = 4, nstart = 25) # k = 3, number of restarts = 25
+k4_BothD$centers
+k4_BothD$size
+
+cluster_Both_Demo4 <- c(1,2,3,4)
+Both_Demo_clusters4 <- cbind(cluster_Both_Demo4, k4_BothD$centers)
+ggparcoord((Both_Demo_clusters4),
+           columns = 1:30, groupColumn = 1, 
+           showPoints = TRUE, 
+           alphaLines = 0.3 
+)
+```
+
+
+.	Cluster 1  is categorized by low volume, low loyalty, and sensitivity to promotions and price. 
+
+.	Cluster 2 it has low brand loyalty.
+
+.	Cluster 3  it is responsive to price category 2 and it is relatively to wealth and educated.
+
+.	Cluster 4  it has high loyalty, low value and price per purchase, and it has low wealth and education.
+
+
+# Q 3 Building model
+```{r}
+set.seed(321)
+k2_Model <- kcca(Both, k = 2, kccaFamily("kmeans")) # k = 2, number of restarts = 25
+k2_Model
+pred <- predict(k2_Model, Both)
+cluster_data <- data.frame(cluster = pred)
+cluster_Demo <- cbind(cluster_data,Demo)
+
+cluster_Demo$cluster <- ifelse(cluster_Demo$cluster==1,1,0)
+head(cluster_Demo)
+cluster_Demo$cluster <- as.factor(cluster_Demo$cluster)
+str(cluster_Demo)
+```
+
+```{r}
+model <- glm(cluster~.,family="binomial", data=cluster_Demo)
+summary(model)
+```
+
+```{r,  fig.height=4.5, fig.width=10}
+Probability <- predict(model, cluster_Demo, type="response")
+Predictions <- ifelse(Probability > 0.35, 1, 0)
+head(Probability)
+table(Predictions, cluster_Demo$cluster)
+mean(Predictions == cluster_Demo$cluster)
+library(pROC)
+roc(cluster_Demo$cluster, Probability)
+plot.roc(cluster_Demo$cluster,Probability)
+```
